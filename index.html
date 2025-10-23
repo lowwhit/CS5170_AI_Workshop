@@ -3,7 +3,126 @@
 <body>
     <input id="userInput" type="text" placeholder="Type a message">
     <button onclick="sendMessage()">Send</button>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: #000;
+            color: #33ff66;
+            font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Terminal window */
+        #terminal {
+            box-sizing: border-box;
+            height: calc(100vh - 60px);
+            margin: 20px;
+            padding: 16px 16px 70px 16px; /* leave room at bottom for the prompt */
+            background: linear-gradient(180deg, #00110a 0%, #000 100%);
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.04);
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+
+        #terminal .line.user::before {
+            content: "$ ";
+            color: #9cff8a;
+        }
+
+        #terminal .line.output {
+            color: #c7f9d0;
+            margin-bottom: 8px;
+        }
+
+        #terminal .welcome {
+            color: rgba(163, 255, 188, 0.9);
+            margin-bottom: 12px;
+        }
+
+        /* Prompt (input + button) styled like a terminal prompt, pinned to bottom */
+        #userInput {
+            position: fixed;
+            left: 24px;
+            right: 120px;
+            bottom: 20px;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #33ff66;
+            font-family: inherit;
+            font-size: 14px;
+            caret-color: #9cff8a;
+        }
+
+        button[onclick] {
+            position: fixed;
+            right: 24px;
+            bottom: 14px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.04);
+            color: #33ff66;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        button[onclick]:hover { background: rgba(255,255,255,0.04); }
+
+        /* Hide the raw response paragraph (script uses it) */
+        #response { display: none; }
+    </style>
+
+    <div id="terminal" role="log" aria-live="polite">
+        <div class="welcome">Welcome to the AI chat Window. Type a message and press Enter or Send.</div>
+    </div>
+
     <p id="response"></p>
+
+    <script>
+        (function () {
+            const terminal = document.getElementById('terminal');
+            const resp = document.getElementById('response');
+            const input = document.getElementById('userInput');
+            const sendBtn = document.querySelector('button[onclick]');
+
+            function appendLine(text, cls) {
+                const line = document.createElement('div');
+                line.className = 'line ' + (cls || '');
+                line.textContent = text;
+                terminal.appendChild(line);
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            // Allow Enter to send
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // trigger send; clicking calls the existing inline onclick sendMessage
+                    sendBtn.click();
+                }
+            });
+
+            // Watch the hidden response node for updates (sendMessage writes here)
+            const mo = new MutationObserver(function () {
+                const text = resp.textContent;
+                if (!text) return;
+                const userText = input.value || '';
+                // show the user command and the response in the terminal
+                if (userText) appendLine(userText, 'user');
+                appendLine(text, 'output');
+                // clear the input for the next command
+                input.value = '';
+                // clear the hidden response so we don't double-handle the same content
+                resp.textContent = '';
+            });
+
+            mo.observe(resp, { characterData: true, childList: true, subtree: true });
+        })();
+    </script>
 
     <script>
         async function sendMessage() {
