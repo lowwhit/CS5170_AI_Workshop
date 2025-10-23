@@ -1,30 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
-<body>
-    <input id="userInput" type="text" placeholder="Type a message">
-    <button onclick="sendMessage()">Send</button>
+<head>
+    <meta charset="UTF-8">
+    <title>AI Chat Window</title>
     <style>
         html, body {
             height: 100%;
             margin: 0;
-            background: #000;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(1200px 600px at 10% 10%, rgba(0,64,32,0.18), transparent 10%),
+                        radial-gradient(800px 400px at 90% 90%, rgba(0,16,8,0.28), transparent 10%),
+                        #000;
             color: #33ff66;
             font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Terminal window */
-        #terminal {
-            box-sizing: border-box;
-            height: calc(100vh - 60px);
-            margin: 20px;
-            padding: 16px 16px 70px 16px; /* leave room at bottom for the prompt */
+        #terminalWindow {
+            position: relative;
+            width: min(80vmin, 680px);
+            height: min(80vmin, 680px);
+            max-width: 680px;
+            max-height: 680px;
+            padding: 56px 16px 16px;
+            border-radius: 12px;
+            box-shadow: 0 18px 40px rgba(0,0,0,0.7), 0 6px 18px rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,255,255,0.06);
             background: linear-gradient(180deg, #00110a 0%, #000 100%);
-            border-radius: 6px;
-            border: 1px solid rgba(255,255,255,0.04);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #terminalWindow::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 46px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00));
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            z-index: 3;
+        }
+
+        #terminalWindow::after {
+            content: "";
+            position: absolute;
+            left: 14px;
+            top: 14px;
+            width: 64px;
+            height: 12px;
+            background:
+              radial-gradient(circle at 6px 6px, #ff5f57 6px, rgba(0,0,0,0.12) 7px),
+              radial-gradient(circle at 26px 6px, #ffbd2e 6px, rgba(0,0,0,0.12) 7px),
+              radial-gradient(circle at 46px 6px, #28c840 6px, rgba(0,0,0,0.12) 7px);
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        .window-title {
+            position: absolute;
+            left: 96px;
+            top: 12px;
+            margin: 0;
+            font-weight: 600;
+            color: rgba(163,255,188,0.95);
+            z-index: 4;
+            pointer-events: none;
+        }
+
+        #terminal {
+            flex: 1 1 auto;
             overflow-y: auto;
+            padding-right: 4px;
             white-space: pre-wrap;
             font-size: 14px;
+            background: transparent;
+        }
+
+        #terminal .welcome {
+            color: rgba(163, 255, 188, 0.9);
+            margin-bottom: 12px;
+        }
+
+        .line {
+            margin-bottom: 8px;
+            opacity: 0;
+            transform: translateY(4px);
+            animation: fadeIn 0.22s ease-out forwards;
         }
 
         #terminal .line.user::before {
@@ -34,20 +104,33 @@
 
         #terminal .line.output {
             color: #c7f9d0;
-            margin-bottom: 8px;
         }
 
-        #terminal .welcome {
-            color: rgba(163, 255, 188, 0.9);
-            margin-bottom: 12px;
+        .line.error {
+            color: #ff7f7f;
         }
 
-        /* Prompt (input + button) styled like a terminal prompt, pinned to bottom */
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #chatPrompt {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .prompt-symbol {
+            color: #9cff8a;
+        }
+
         #userInput {
-            position: fixed;
-            left: 24px;
-            right: 120px;
-            bottom: 20px;
+            flex: 1;
             background: transparent;
             border: none;
             outline: none;
@@ -57,10 +140,11 @@
             caret-color: #9cff8a;
         }
 
-        button[onclick] {
-            position: fixed;
-            right: 24px;
-            bottom: 14px;
+        #userInput::placeholder {
+            color: rgba(51, 255, 102, 0.4);
+        }
+
+        #sendBtn {
             background: rgba(255,255,255,0.03);
             border: 1px solid rgba(255,255,255,0.04);
             color: #33ff66;
@@ -70,24 +154,38 @@
             font-family: inherit;
         }
 
-        button[onclick]:hover { background: rgba(255,255,255,0.04); }
+        #sendBtn:hover {
+            background: rgba(255,255,255,0.04);
+        }
 
-        /* Hide the raw response paragraph (script uses it) */
-        #response { display: none; }
+        #sendBtn:focus-visible {
+            outline: 2px solid rgba(51, 255, 102, 0.6);
+            outline-offset: 2px;
+        }
+
+        #response {
+            display: none;
+        }
     </style>
-
-    <div id="terminal" role="log" aria-live="polite">
-        <div class="welcome">Welcome to the AI chat Window. Type a message and press Enter or Send.</div>
+</head>
+<body>
+    <div id="terminalWindow">
+        <p class="window-title">AI Chat</p>
+        <div id="terminal" role="log" aria-live="polite">
+            <div class="welcome">Welcome to the AI chat Window. Type a message and press Enter or Send.</div>
+        </div>
+        <form id="chatPrompt" autocomplete="off">
+            <span class="prompt-symbol">$</span>
+            <input id="userInput" type="text" placeholder="Type a message" aria-label="Message">
+            <button id="sendBtn" type="submit">Send</button>
+        </form>
     </div>
-
-    <p id="response"></p>
 
     <script>
         (function () {
             const terminal = document.getElementById('terminal');
-            const resp = document.getElementById('response');
             const input = document.getElementById('userInput');
-            const sendBtn = document.querySelector('button[onclick]');
+            const form = document.getElementById('chatPrompt');
 
             function appendLine(text, cls) {
                 const line = document.createElement('div');
@@ -97,44 +195,37 @@
                 terminal.scrollTop = terminal.scrollHeight;
             }
 
-            // Allow Enter to send
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    // trigger send; clicking calls the existing inline onclick sendMessage
-                    sendBtn.click();
+            async function sendMessage(message) {
+                try {
+                    const res = await fetch('http://localhost:3000/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message })
+                    });
+
+                    if (!res.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+
+                    const data = await res.json();
+                    appendLine(data.content || '', 'output');
+                } catch (err) {
+                    appendLine('Unable to reach the server.', 'output error');
                 }
-            });
+            }
 
-            // Watch the hidden response node for updates (sendMessage writes here)
-            const mo = new MutationObserver(function () {
-                const text = resp.textContent;
-                if (!text) return;
-                const userText = input.value || '';
-                // show the user command and the response in the terminal
-                if (userText) appendLine(userText, 'user');
-                appendLine(text, 'output');
-                // clear the input for the next command
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const message = input.value.trim();
+                if (!message) return;
+
+                appendLine(message, 'user');
                 input.value = '';
-                // clear the hidden response so we don't double-handle the same content
-                resp.textContent = '';
-            });
+                input.focus();
 
-            mo.observe(resp, { characterData: true, childList: true, subtree: true });
+                await sendMessage(message);
+            });
         })();
-    </script>
-
-    <script>
-        async function sendMessage() {
-            const message = document.getElementById('userInput').value;
-            const res = await fetch('http://localhost:3000/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message })
-            });
-            const data = await res.json();
-            document.getElementById('response').innerText = data.content;
-        }
     </script>
 </body>
 </html>
